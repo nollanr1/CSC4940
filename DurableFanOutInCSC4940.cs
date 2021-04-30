@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System.Net; //For webrequests, since system.net.http doesn't seem to cover that
 using System.Net.Http;
+using System.IO; //Allows for stream objects
 using System.Threading.Tasks;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
@@ -12,7 +14,7 @@ namespace Company.Function
     public static class DurableFanOutInCSC4940
     {
         static readonly string[] urlList = {
-        "https://www.datesfoundation.org/Careers",
+        "https://www.gatesfoundation.org/about/careers",
         "https://www.cwb.org/careers",
         "https://phh.tbe.taleo.net/phh01/ats/careers/searchResults.jsp?org=SPACENEEDLE&cws=5",
         "https://unitedindians.org/about/jobs/",
@@ -23,7 +25,7 @@ namespace Company.Function
         "https://recruiting2.ultipro.com/MUS1007MMF",
         "https://mohai.org/about/#opportunities",
         "https://www.nordicmuseum.org/about/jobs",
-        "https://seattleartmuseum.apploytojob.com/apply",
+        "https://seattleartmuseum.applytojob.com/apply",
         "https://us59.dayforcehcm.com/CandidatePortal/en-US/pacsci",
         "https://seattleaquarium.org/careers#openings",
         "https://seattleartmuseum.applytojob.com/apply",
@@ -73,9 +75,29 @@ log.LogInformation($"All URLs complete.");
         public static string FetchHTML([ActivityTrigger] string targetURL, ILogger log)
         /*This function should fetch the HTML from a target page, process it, and return JSON representing job listings.*/
         {
-            //TODO: Actually write this code
+            //TODO: remove debug LOG statements
             log.LogInformation($"Saying hello to {targetURL}.");
-            return $"Hello {targetURL}!";
+            WebRequest urlGetter;
+            urlGetter = WebRequest.Create(targetURL);
+            Stream htmlStream;
+            StreamReader readStream;
+            System.Text.Encoding encode = System.Text.Encoding.GetEncoding("utf-8");
+            //TODO: Process this data
+            try {
+                //TODO: Return actual data, not simply "Hello {readString}!" (The first line of the response.)
+                htmlStream = urlGetter.GetResponse().GetResponseStream(); //Not doing this async because everything depends on the response, so it's blocking anyways.
+                readStream = new StreamReader(htmlStream, encode);
+                System.String readString;
+                readString = readStream.ReadLine() + readStream.ReadLine();
+                readStream.Close();
+                htmlStream.Close();
+                return $"Hello {targetURL}: {readString}!";
+            }
+            catch (System.Exception e) {
+                //readStream.Close();
+                //htmlStream.Close(); Hopefully these auto-close on program death... TODO: Make these close more reliably.
+                return $"Encountered an error while processing {targetURL} (Error ID: {e}).";
+            }
         }
 
         [FunctionName("DurableFanOutInCSC4940_HttpStart")]
