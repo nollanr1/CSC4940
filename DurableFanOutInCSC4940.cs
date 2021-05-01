@@ -42,8 +42,8 @@ namespace Company.Function
             It will also provide the correct processing rule.
             It will then save the complete JSON these functions return once they finish fanning in.*/
         {
-            var parallelTasks = new List<Task<string>>(); //Specifically JSON strings
-            var outputs = new List<string>(); //TODO: COMPILE JSON IN HERE
+            var parallelTasks = new List<Task<string>>(); //Yes, each string will be an entire page of HTML
+            var outputs = new List<string>(); //'outputs' is the ultimate return value, what will be saved to the Blob
 log.LogInformation($"Hit orchestrator.");
             foreach (string url in urlList)
             {
@@ -66,6 +66,7 @@ log.LogInformation($"All URLs complete.");
             outputs.Add("This is a dummy string for Testing.");
             foreach (Task<string> jsonBlock in parallelTasks)
             {
+                //TODO: Invoke the JSON EXTRACTOR HERE to process the HTML instead of just adding the raw HTML.
                 outputs.Add(jsonBlock.Result);
             }
             return outputs; //TODO: RETURN ACTUAL JSON HERE (AND THEN SAVE IT TO FILE)
@@ -82,9 +83,7 @@ log.LogInformation($"All URLs complete.");
             Stream htmlStream;
             StreamReader readStream;
             System.Text.Encoding encode = System.Text.Encoding.GetEncoding("utf-8");
-            //TODO: Process this data
             try {
-                //TODO: Return actual data, not simply "Hello {readString}!" (The first line of the response.)
                 htmlStream = urlGetter.GetResponse().GetResponseStream(); //Not doing this async because everything depends on the response, so it's blocking anyways.
                 readStream = new StreamReader(htmlStream, encode);
                 System.String readString;
@@ -92,6 +91,11 @@ log.LogInformation($"All URLs complete.");
                 readStream.Close();
                 htmlStream.Close();
                 return $"MASS TEXT OF {targetURL}: {readString}!";
+                /*This should return to the orchestrator, which in turn calls processing functions.
+                If I have this function call functions, then they wait - and get charged for waiting!
+                Microsoft cites this as a common antipattern.
+                However, the orchestrator is halted (and thus not charged) while it waits, because Microsoft specfically built for this pattern.
+                However, I DO get charged as a separate invocation every time the orchestrator is called back... I wonder how that works out.*/
             }
             catch (System.Exception e) {
                 //readStream.Close();
