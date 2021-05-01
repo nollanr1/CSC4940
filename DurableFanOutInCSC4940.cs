@@ -15,14 +15,14 @@ namespace Company.Function
     {
         static readonly string[] urlList = {
         "https://www.gatesfoundation.org/about/careers",
-        "https://www.cwb.org/careers",
+        //"https://www.cwb.org/careers", //TODO: MAKE THIS WEBSITE PLAY NICE (STRETCH GOAL) - THROWS 400 ERROR
         "https://phh.tbe.taleo.net/phh01/ats/careers/searchResults.jsp?org=SPACENEEDLE&cws=5",
         "https://unitedindians.org/about/jobs/",
         "https://mopop.org/about-mopop/get-involved/join-the-team/",
         "https://fryemuseum.org/employment/",
         "https://henryart.org/about/opportunities#page-navigation-jobs",
         "http://jobs.jobvite.com/lcm-plus-labs",
-        "https://recruiting2.ultipro.com/MUS1007MMF",
+        //"https://recruiting2.ultipro.com/MUS1007MMF", ////TODO: MAKE THIS WEBSITE PLAY NICE (STRETCH GOAL) - CANNOT ESTABLISH SSL CONNECTION (Very long error description.)
         "https://mohai.org/about/#opportunities",
         "https://www.nordicmuseum.org/about/jobs",
         "https://seattleartmuseum.applytojob.com/apply",
@@ -32,7 +32,7 @@ namespace Company.Function
         "https://thechildrensmuseum.org/visit/contact/job-opportunities/",
         "https://www.virginiav.org/employment/",
         "https://wingluke.org/jobs/",
-        "https://www2.appone.com/Search/Search.aspx?ServerVar=WoodlandParkZoo.appone.com&results=yes"
+        "https://www2.appone.com/Search/Search.aspx?ServerVar=WoodlandParkZoo.appone.com&results=yes" //TODO: Bring back the other strings too.
         };
 
         [FunctionName("DurableFanOutInCSC4940")]
@@ -88,10 +88,10 @@ log.LogInformation($"All URLs complete.");
                 htmlStream = urlGetter.GetResponse().GetResponseStream(); //Not doing this async because everything depends on the response, so it's blocking anyways.
                 readStream = new StreamReader(htmlStream, encode);
                 System.String readString;
-                readString = readStream.ReadLine() + readStream.ReadLine();
+                readString = readStream.ReadToEnd(); //NOTE: Storing this all in one string puts a strict 2GB limit on a single page that can be loaded. Hey, technology progresses...
                 readStream.Close();
                 htmlStream.Close();
-                return $"Hello {targetURL}: {readString}!";
+                return $"MASS TEXT OF {targetURL}: {readString}!";
             }
             catch (System.Exception e) {
                 //readStream.Close();
