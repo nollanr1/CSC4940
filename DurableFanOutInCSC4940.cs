@@ -75,6 +75,13 @@ namespace Company.Function
                 outputs.Add(jsonBlock.Result);
             }
             //TODO: Collate the individual JSON chunks into one big (safely escaped) string.
+            /******************IMPORTANT: ******************************
+            I can probably accomplish these two things with Json.NET https://www.newtonsoft.com/json
+            Planned structure: create a list of "Job" objects,
+            Then use Json.net to convert that list into a collection of correctly formatted strings.
+            I should be able to mash those strings together without much trouble,
+            which I can then upload as a nice, relatively pretty blob.
+            *******************************************************************/
 
             /*******************
             This next code turns the strings into streams.
