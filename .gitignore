@@ -4,6 +4,9 @@
 # Azure Functions localsettings file
 local.settings.json
 
+# Connection string file - this contains a raw password and thus shouldn't be in source control
+appsettings.json
+
 # User-specific files
 *.suo
 *.user

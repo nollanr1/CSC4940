@@ -8,6 +8,8 @@ using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Host;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
+using Azure.Storage.Blobs;
 
 namespace Company.Function
 {
@@ -34,6 +36,8 @@ namespace Company.Function
         "https://wingluke.org/jobs/",
         "https://www2.appone.com/Search/Search.aspx?ServerVar=WoodlandParkZoo.appone.com&results=yes" //TODO: Bring back the other strings too.
         };
+        static readonly string containerName = "scrapeddata";
+        static readonly string blobName = "raw-output";
 
         [FunctionName("DurableFanOutInCSC4940")]
         public static async Task<List<string>> RunOrchestrator(
@@ -44,31 +48,46 @@ namespace Company.Function
         {
             var parallelTasks = new List<Task<string>>(); //Yes, each string will be an entire page of HTML
             var outputs = new List<string>(); //'outputs' is the ultimate return value, what will be saved to the Blob
-log.LogInformation($"Hit orchestrator.");
             foreach (string url in urlList)
             {
                 Task<string> task = context.CallActivityAsync<string>("DurableFanOutInCSC4940_FetchHTML", url);
                 parallelTasks.Add(task);
-log.LogInformation($"Processing URL = '{url}'.");
             }
 
             await Task.WhenAll(parallelTasks); //Thus we don't proceed past until all threads finish.
-log.LogInformation($"All URLs complete.");
 
+            //Now we'll prepare the blob client.
+            //I used to have this during the async part...
+            //But I believe it was firing on each thread. Which I don't want.
+            var builder = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory()) //Hopefully that doesn't mess something ELSE up.
+                .AddJsonFile("appsettings.json");
+            var configuration = builder.Build();
+            var connectionString = configuration.GetConnectionString("StorageAccount");
+            BlobContainerClient container = new BlobContainerClient(connectionString, containerName);
+            container.CreateIfNotExists(); //It SHOULD exist, but just in case it doesn't...
+            BlobClient blobClient = container.GetBlobClient(blobName);
 
-            // Replace "hello" with the name of your Durable Activity Function.
-            /*
-            outputs.Add(await context.CallActivityAsync<string>("DurableFanOutInCSC4940_Hello", "https://www.cwb.org/careers"));
-            outputs.Add(await context.CallActivityAsync<string>("DurableFanOutInCSC4940_Hello", "PlaceholderString"));
-            outputs.Add(await context.CallActivityAsync<string>("DurableFanOutInCSC4940_Hello", "PlaceholderString"));
-            */
-            // returns ["Hello Tokyo!", "Hello Seattle!", "Hello London!"]
             outputs.Add("This is a dummy string for Testing.");
             foreach (Task<string> jsonBlock in parallelTasks)
             {
                 //TODO: Invoke the JSON EXTRACTOR HERE to process the HTML instead of just adding the raw HTML.
                 outputs.Add(jsonBlock.Result);
             }
+            //TODO: Collate the individual JSON chunks into one big (safely escaped) string.
+
+            /*******************
+            This next code turns the strings into streams.
+            If there's some sort of StringStream class, I couldn't find documentation for it.
+            ********************/
+            var stream = new MemoryStream();
+            var writer = new StreamWriter(stream);
+            writer.Write(outputs[0]);
+            writer.Flush();
+            stream.Position = 0;
+            //***END string-to-stream conversion code***
+            blobClient.Upload(stream, true).ToString();
+            
             return outputs; //TODO: RETURN ACTUAL JSON HERE (AND THEN SAVE IT TO FILE)
         }
 
