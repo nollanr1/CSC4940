@@ -10,15 +10,16 @@ using Microsoft.Azure.WebJobs.Host;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using Azure.Storage.Blobs;
+using HtmlAgilityPack; //This allows for the relatively easy parsing of the imported HTML.
 
 namespace Company.Function
 {
     public static class DurableFanOutInCSC4940
     {
         static readonly string[] urlList = {
+        "https://phh.tbe.taleo.net/phh01/ats/careers/searchResults.jsp?org=SPACENEEDLE&cws=5"/*,
         "https://www.gatesfoundation.org/about/careers",
         //"https://www.cwb.org/careers", //TODO: MAKE THIS WEBSITE PLAY NICE (STRETCH GOAL) - THROWS 400 ERROR
-        "https://phh.tbe.taleo.net/phh01/ats/careers/searchResults.jsp?org=SPACENEEDLE&cws=5",
         "https://unitedindians.org/about/jobs/",
         "https://mopop.org/about-mopop/get-involved/join-the-team/",
         "https://fryemuseum.org/employment/",
@@ -35,6 +36,7 @@ namespace Company.Function
         "https://www.virginiav.org/employment/",
         "https://wingluke.org/jobs/",
         "https://www2.appone.com/Search/Search.aspx?ServerVar=WoodlandParkZoo.appone.com&results=yes" //TODO: Bring back the other strings too.
+        */
         };
         static readonly string containerName = "scrapeddata";
         static readonly string blobName = "raw-output";
@@ -69,11 +71,14 @@ namespace Company.Function
             BlobClient blobClient = container.GetBlobClient(blobName);
 
             outputs.Add("This is a dummy string for Testing.");
+            outputs.Add(TaleoNetProcessor(parallelTasks[0].Result, log)); //Here's hoping this is the correct way to pass the logger.
+            /*
             foreach (Task<string> jsonBlock in parallelTasks)
             {
                 //TODO: Invoke the JSON EXTRACTOR HERE to process the HTML instead of just adding the raw HTML.
                 outputs.Add(jsonBlock.Result);
             }
+            */
             //TODO: Collate the individual JSON chunks into one big (safely escaped) string.
             /******************IMPORTANT: ******************************
             I can probably accomplish these two things with Json.NET https://www.newtonsoft.com/json
@@ -129,6 +134,34 @@ namespace Company.Function
                 return $"Encountered an error while processing {targetURL} (Error ID: {e}).";
             }
         }
+
+        [FunctionName("TaleoNetProcessor")]
+        public static string TaleoNetProcessor([ActivityTrigger] string incomingHTML, ILogger log)
+        {
+            var htmlDoc = new HtmlDocument();
+            htmlDoc.LoadHtml(incomingHTML);
+            var query = "//table[@id='cws-search-results']/tr";
+            htmlDoc.DocumentNode.SelectNodes(query);
+            //I've found it's best to practice these queries with https://dotnetfiddle.net/fKeTAp
+            //Except, uh, I did it too much and ran out free processing.
+            /* TODO: Programmatically obtain each piece and convert the lot into coherent JSON objects.
+            //The following is example code for dotnetfiddle.
+            //
+            Console.WriteLine(node[0].OuterHtml);
+		
+            Console.WriteLine(node[1].ChildNodes[1].ChildNodes[0].InnerText);
+            Console.WriteLine(node[1].ChildNodes[1].ChildNodes[0].OuterHtml);
+            Console.WriteLine(node[1].ChildNodes[3].OuterHtml);
+            Console.WriteLine(node[1].ChildNodes[5].OuterHtml);
+            Console.WriteLine(node[1].ChildNodes[7].OuterHtml);
+            
+            Console.WriteLine(node[2].ChildNodes[5].InnerText);
+            Console.WriteLine(node[3].ChildNodes[5].InnerText);
+            Console.WriteLine(node[4].ChildNodes[5].InnerText);
+            */
+
+            return incomingHTML;
+        } 
 
         [FunctionName("DurableFanOutInCSC4940_HttpStart")]
         public static async Task<HttpResponseMessage> HttpStart(
