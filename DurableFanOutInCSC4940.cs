@@ -159,6 +159,7 @@ namespace Company.Function
                 taleoJob.details[0].closebydate = tableRow[3].InnerText;
                 taleoJob.details[0].salary = tableRow[5].InnerText;
                 taleoJob.host = tableRow[7].InnerText;
+                //TODO: GET THE APPLINK
                 taleoJobList.Add(taleoJob);
                 }
             }
