@@ -11,6 +11,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using Azure.Storage.Blobs;
 using HtmlAgilityPack; //This allows for the relatively easy parsing of the imported HTML.
+using Newtonsoft.Json; //This protects my JSON from potential injection attacks... Hopefully.
 
 namespace Company.Function
 {
@@ -41,6 +42,19 @@ namespace Company.Function
         static readonly string containerName = "scrapeddata";
         static readonly string blobName = "raw-output";
 
+        public class Details
+        {
+            public string applink = null;
+            public string salary = null;
+            public string title = null;
+            public string closebydate = null;
+        }
+        public class JobListing
+        {
+            public string host = null;
+            public List<Details> details = new List<Details>(); 
+        }
+
         [FunctionName("DurableFanOutInCSC4940")]
         public static async Task<List<string>> RunOrchestrator(
             [OrchestrationTrigger] IDurableOrchestrationContext context, ILogger log)
@@ -70,23 +84,13 @@ namespace Company.Function
             container.CreateIfNotExists(); //It SHOULD exist, but just in case it doesn't...
             BlobClient blobClient = container.GetBlobClient(blobName);
 
-            outputs.Add("This is a dummy string for Testing.");
-            outputs.Add(TaleoNetProcessor(parallelTasks[0].Result, log)); //Here's hoping this is the correct way to pass the logger.
-            /*
-            foreach (Task<string> jsonBlock in parallelTasks)
-            {
-                //TODO: Invoke the JSON EXTRACTOR HERE to process the HTML instead of just adding the raw HTML.
-                outputs.Add(jsonBlock.Result);
-            }
-            */
-            //TODO: Collate the individual JSON chunks into one big (safely escaped) string.
-            /******************IMPORTANT: ******************************
-            I can probably accomplish these two things with Json.NET https://www.newtonsoft.com/json
-            Planned structure: create a list of "Job" objects,
-            Then use Json.net to convert that list into a collection of correctly formatted strings.
-            I should be able to mash those strings together without much trouble,
-            which I can then upload as a nice, relatively pretty blob.
-            *******************************************************************/
+            //outputs.Add("This is a dummy string for Testing.");
+            //outputs.Add(TaleoNetProcessor(parallelTasks[0].Result, log)); //Here's hoping this is the correct way to pass the logger.
+            List<JobListing> summatedJobList = new List<JobListing>();
+            summatedJobList.AddRange(TaleoNetProcessor(parallelTasks[0].Result, log));
+            //TODO: Add the rest of the jobs! Also, see if I can do this async.
+            outputs.Add("{\"hosts\": "+ JsonConvert.SerializeObject(summatedJobList) + "}");
+
 
             /*******************
             This next code turns the strings into streams.
@@ -100,7 +104,7 @@ namespace Company.Function
             //***END string-to-stream conversion code***
             blobClient.Upload(stream, true).ToString();
             
-            return outputs; //TODO: RETURN ACTUAL JSON HERE (AND THEN SAVE IT TO FILE)
+            return outputs; //TODO: Swap this return value for something more lightweight, since I've uploaded needed data?
         }
 
         [FunctionName("DurableFanOutInCSC4940_FetchHTML")]
@@ -136,31 +140,30 @@ namespace Company.Function
         }
 
         [FunctionName("TaleoNetProcessor")]
-        public static string TaleoNetProcessor([ActivityTrigger] string incomingHTML, ILogger log)
+        public static List<JobListing> TaleoNetProcessor([ActivityTrigger] string incomingHTML, ILogger log)
         {
+            List<JobListing> taleoJobList = new List<JobListing>();
             var htmlDoc = new HtmlDocument();
             htmlDoc.LoadHtml(incomingHTML);
-            var query = "//table[@id='cws-search-results']/tr";
-            htmlDoc.DocumentNode.SelectNodes(query);
+            var query = "//table[@id='cws-search-results']";
+            var node = htmlDoc.DocumentNode.SelectSingleNode(query);
+            node.FirstChild.Remove();
+            node.FirstChild.Remove();
+            HtmlNodeCollection childNodes = node.ChildNodes;
+            foreach(var offpsringNode in childNodes) {
+                HtmlNodeCollection tableRow = offpsringNode.ChildNodes;
+                if(tableRow.Count >= 7) { //The way the incoming table is structured, the data I want is on columns 1, 3, 5, 7
+                JobListing taleoJob = new JobListing();
+                taleoJob.details.Add(new Details()); //Ideally, I'd figure out how to have these add automatically... TODO: Make a proper constructor.
+                taleoJob.details[0].title = tableRow[1].InnerText;
+                taleoJob.details[0].closebydate = tableRow[3].InnerText;
+                taleoJob.details[0].salary = tableRow[5].InnerText;
+                taleoJob.host = tableRow[7].InnerText;
+                taleoJobList.Add(taleoJob);
+                }
+            }
             //I've found it's best to practice these queries with https://dotnetfiddle.net/fKeTAp
-            //Except, uh, I did it too much and ran out free processing.
-            /* TODO: Programmatically obtain each piece and convert the lot into coherent JSON objects.
-            //The following is example code for dotnetfiddle.
-            //
-            Console.WriteLine(node[0].OuterHtml);
-		
-            Console.WriteLine(node[1].ChildNodes[1].ChildNodes[0].InnerText);
-            Console.WriteLine(node[1].ChildNodes[1].ChildNodes[0].OuterHtml);
-            Console.WriteLine(node[1].ChildNodes[3].OuterHtml);
-            Console.WriteLine(node[1].ChildNodes[5].OuterHtml);
-            Console.WriteLine(node[1].ChildNodes[7].OuterHtml);
-            
-            Console.WriteLine(node[2].ChildNodes[5].InnerText);
-            Console.WriteLine(node[3].ChildNodes[5].InnerText);
-            Console.WriteLine(node[4].ChildNodes[5].InnerText);
-            */
-
-            return incomingHTML;
+            return taleoJobList;
         } 
 
         [FunctionName("DurableFanOutInCSC4940_HttpStart")]
