@@ -48,6 +48,7 @@ namespace Company.Function
             public string salary = null;
             public string title = null;
             public string closebydate = null;
+            public string description = null;
         }
         public class JobListing
         {
@@ -144,27 +145,40 @@ namespace Company.Function
         {
             List<JobListing> taleoJobList = new List<JobListing>();
             var htmlDoc = new HtmlDocument();
-            htmlDoc.LoadHtml(incomingHTML);
-            var query = "//table[@id='cws-search-results']";
-            var node = htmlDoc.DocumentNode.SelectSingleNode(query);
-            node.FirstChild.Remove();
-            node.FirstChild.Remove();
-            HtmlNodeCollection childNodes = node.ChildNodes;
-            foreach(var offpsringNode in childNodes) {
-                HtmlNodeCollection tableRow = offpsringNode.ChildNodes;
-                if(tableRow.Count >= 7) { //The way the incoming table is structured, the data I want is on columns 1, 3, 5, 7
-                JobListing taleoJob = new JobListing();
-                taleoJob.details.Add(new Details()); //Ideally, I'd figure out how to have these add automatically... TODO: Make a proper constructor.
-                taleoJob.details[0].title = tableRow[1].InnerText;
-                taleoJob.details[0].closebydate = tableRow[3].InnerText;
-                taleoJob.details[0].salary = tableRow[5].InnerText;
-                taleoJob.host = tableRow[7].InnerText;
-                //TODO: GET THE APPLINK
-                taleoJobList.Add(taleoJob);
+            try {
+                htmlDoc.LoadHtml(incomingHTML);
+                var query = "//table[@id='cws-search-results']";
+                var node = htmlDoc.DocumentNode.SelectSingleNode(query);
+                node.FirstChild.Remove();
+                node.FirstChild.Remove();
+                HtmlNodeCollection childNodes = node.ChildNodes;
+                foreach(var offpsringNode in childNodes) {
+                    HtmlNodeCollection tableRow = offpsringNode.ChildNodes;
+                    if(tableRow.Count >= 7) { //The way the incoming table is structured, the data I want is on columns 1, 3, 5, 7
+                    JobListing taleoJob = new JobListing();
+                    taleoJob.details.Add(new Details()); //Ideally, I'd figure out how to have these add automatically... TODO: Make a proper constructor.
+                    taleoJob.details[0].title = tableRow[1].InnerText;
+                    taleoJob.details[0].applink = tableRow[1].FirstChild.FirstChild.Attributes["href"].Value; //Woo, much dereferencing, much wow.
+                    taleoJob.details[0].closebydate = tableRow[3].InnerText;
+                    taleoJob.details[0].salary = tableRow[5].InnerText;
+                    taleoJob.host = tableRow[7].InnerText;
+                    //TODO: GET THE APPLINK
+                    taleoJobList.Add(taleoJob);
+                    }
                 }
+                //I've found it's best to practice these queries with https://dotnetfiddle.net/fKeTAp
+                return taleoJobList;
             }
-            //I've found it's best to practice these queries with https://dotnetfiddle.net/fKeTAp
-            return taleoJobList;
+            catch (System.Exception e) {
+                JobListing errorMessage = new JobListing();
+                errorMessage.host = "Processing Error";
+                errorMessage.details.Add(new Details());
+                errorMessage.details[0].applink = urlList[0];
+                errorMessage.details[0].title = "Error Details";
+                errorMessage.details[0].description = e.ToString();
+                taleoJobList.Add(errorMessage);
+                return taleoJobList;
+            }
         } 
 
         [FunctionName("DurableFanOutInCSC4940_HttpStart")]
