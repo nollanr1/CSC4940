@@ -18,17 +18,17 @@ namespace Company.Function
     public static class DurableFanOutInCSC4940
     {
         static readonly string[] urlList = {
-        "https://phh.tbe.taleo.net/phh01/ats/careers/searchResults.jsp?org=SPACENEEDLE&cws=5"/*,
+        "https://phh.tbe.taleo.net/phh01/ats/careers/searchResults.jsp?org=SPACENEEDLE&cws=5",
+        "https://www.nordicmuseum.org/about/jobs"/*,
+        "https://unitedindians.org/about/jobs/",
         "https://www.gatesfoundation.org/about/careers",
         //"https://www.cwb.org/careers", //TODO: MAKE THIS WEBSITE PLAY NICE (STRETCH GOAL) - THROWS 400 ERROR
-        "https://unitedindians.org/about/jobs/",
         "https://mopop.org/about-mopop/get-involved/join-the-team/",
         "https://fryemuseum.org/employment/",
         "https://henryart.org/about/opportunities#page-navigation-jobs",
-        "http://jobs.jobvite.com/lcm-plus-labs",
+        "http://jobs.jobvite.com/lcm-plus-labs", //Well, I can't do anything with this one because there's no jobs posted for it right now.
         //"https://recruiting2.ultipro.com/MUS1007MMF", ////TODO: MAKE THIS WEBSITE PLAY NICE (STRETCH GOAL) - CANNOT ESTABLISH SSL CONNECTION (Very long error description.)
         "https://mohai.org/about/#opportunities",
-        "https://www.nordicmuseum.org/about/jobs",
         "https://seattleartmuseum.applytojob.com/apply",
         "https://us59.dayforcehcm.com/CandidatePortal/en-US/pacsci",
         "https://seattleaquarium.org/careers#openings",
@@ -88,7 +88,9 @@ namespace Company.Function
             //outputs.Add("This is a dummy string for Testing.");
             //outputs.Add(TaleoNetProcessor(parallelTasks[0].Result, log)); //Here's hoping this is the correct way to pass the logger.
             List<JobListing> summatedJobList = new List<JobListing>();
+            //I've found it's best to practice these queries with https://dotnetfiddle.net/fKeTAp
             summatedJobList.AddRange(TaleoNetProcessor(parallelTasks[0].Result, log));
+            summatedJobList.AddRange(NordicMuseumProcessor(parallelTasks[1].Result, log));
             //TODO: Add the rest of the jobs! Also, see if I can do this async.
             outputs.Add("{\"hosts\": "+ JsonConvert.SerializeObject(summatedJobList) + "}");
 
@@ -166,7 +168,6 @@ namespace Company.Function
                     taleoJobList.Add(taleoJob);
                     }
                 }
-                //I've found it's best to practice these queries with https://dotnetfiddle.net/fKeTAp
                 return taleoJobList;
             }
             catch (System.Exception e) {
@@ -179,7 +180,54 @@ namespace Company.Function
                 taleoJobList.Add(errorMessage);
                 return taleoJobList;
             }
-        } 
+        }
+
+        [FunctionName("NordicMuseumProcessor")]
+        public static List<JobListing> NordicMuseumProcessor([ActivityTrigger] string incomingHTML, ILogger log)
+        {
+            List<JobListing> nordicJobList = new List<JobListing>();
+            var htmlDoc = new HtmlDocument();
+            try {
+                htmlDoc.LoadHtml(incomingHTML);
+                var query = "//div[@class='node__content']/div/div/div/div";
+                //dotnetfiddle code - Cut-And-Paste back into dotnetfiddle to keep experimenting.
+                //I'll need to clean up the results but the start of the guts seem to be here.
+                /********************************************************************************
+                {
+                        var html = @"https://www.nordicmuseum.org/about/jobs";
+
+                        HtmlWeb web = new HtmlWeb();
+                        
+                        var htmlDoc = web.Load(html);
+                        
+                        var query = "//div[@class='node__content']/div/div/div/div";
+
+                        var htmlBody = htmlDoc.DocumentNode.SelectSingleNode(query);
+                        
+                        var htmlChildren = htmlBody.ChildNodes;
+                        var loopControl = 8;
+                        for(var i = 8; i<= htmlChildren.Count; i+=loopControl) {
+                            Console.WriteLine("i value: "+ i.ToString() );
+                            Console.WriteLine("Title: " + htmlChildren[i-5].InnerHtml);
+                            Console.WriteLine("Description: " + htmlChildren[i-3].InnerHtml);
+                            Console.WriteLine("applink: " + htmlChildren[i-1].InnerHtml);
+                        }
+                    }
+                *********************************************************************************/
+
+            }
+            catch (System.Exception e) {
+                JobListing errorMessage = new JobListing();
+                errorMessage.host = "Processing Error";
+                errorMessage.details.Add(new Details());
+                errorMessage.details[0].applink = urlList[1];
+                errorMessage.details[0].title = "Error Details";
+                errorMessage.details[0].description = e.ToString();
+                nordicJobList.Add(errorMessage);
+            }
+
+            return nordicJobList;
+        }
 
         [FunctionName("DurableFanOutInCSC4940_HttpStart")]
         public static async Task<HttpResponseMessage> HttpStart(
