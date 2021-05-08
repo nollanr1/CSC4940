@@ -49,6 +49,8 @@ namespace Company.Function
             public string title = null;
             public string closebydate = null;
             public string description = null;
+            public string othernotes = null;
+            public string emailcontact = null;
         }
         public class JobListing
         {
@@ -162,7 +164,6 @@ namespace Company.Function
                     taleoJob.details[0].closebydate = tableRow[3].InnerText;
                     taleoJob.details[0].salary = tableRow[5].InnerText;
                     taleoJob.host = tableRow[7].InnerText;
-                    //TODO: GET THE APPLINK
                     taleoJobList.Add(taleoJob);
                     }
                 }
@@ -199,6 +200,13 @@ namespace Company.Function
                     nordicJobs.details.Add(new Details());
                     nordicJobs.details[currentArr].title = htmlChildren[i-5].InnerHtml;
                     nordicJobs.details[currentArr].description = htmlChildren[i-3].InnerHtml;
+                    nordicJobs.details[currentArr].applink = htmlChildren[i-1].ChildNodes[1].Attributes["href"].Value;
+                    nordicJobs.details[currentArr].salary = htmlChildren[i-1].ChildNodes[2].InnerHtml.Remove(0, 2); //There's a ". " at the start of this string, which we'll discard.
+                    nordicJobs.details[currentArr].closebydate = htmlChildren[i-1].ChildNodes[10].InnerHtml.Trim();
+                    nordicJobs.details[currentArr].emailcontact = htmlChildren[i-1].ChildNodes[6].Attributes["href"].Value;
+                    nordicJobs.details[currentArr].othernotes = (htmlChildren[i-1].ChildNodes[5].InnerHtml.TrimStart() +
+                                                                htmlChildren[i-1].ChildNodes[6].InnerHtml +
+                                                                htmlChildren[i-1].ChildNodes[7].InnerHtml);
                 }
                 nordicJobList.Add(nordicJobs);
             }
