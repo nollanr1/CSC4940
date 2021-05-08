@@ -85,11 +85,9 @@ namespace Company.Function
             container.CreateIfNotExists(); //It SHOULD exist, but just in case it doesn't...
             BlobClient blobClient = container.GetBlobClient(blobName);
 
-            //outputs.Add("This is a dummy string for Testing.");
-            //outputs.Add(TaleoNetProcessor(parallelTasks[0].Result, log)); //Here's hoping this is the correct way to pass the logger.
             List<JobListing> summatedJobList = new List<JobListing>();
             //I've found it's best to practice these queries with https://dotnetfiddle.net/fKeTAp
-            summatedJobList.AddRange(TaleoNetProcessor(parallelTasks[0].Result, log));
+            summatedJobList.AddRange(TaleoNetProcessor(parallelTasks[0].Result, log)); //Here's hoping this is the correct way to pass the logger.
             summatedJobList.AddRange(NordicMuseumProcessor(parallelTasks[1].Result, log));
             //TODO: Add the rest of the jobs! Also, see if I can do this async.
             outputs.Add("{\"hosts\": "+ JsonConvert.SerializeObject(summatedJobList) + "}");
@@ -186,35 +184,23 @@ namespace Company.Function
         public static List<JobListing> NordicMuseumProcessor([ActivityTrigger] string incomingHTML, ILogger log)
         {
             List<JobListing> nordicJobList = new List<JobListing>();
+            JobListing nordicJobs = new JobListing();
+            nordicJobs.host = "National Nordic Museum";
             var htmlDoc = new HtmlDocument();
             try {
                 htmlDoc.LoadHtml(incomingHTML);
                 var query = "//div[@class='node__content']/div/div/div/div";
-                //dotnetfiddle code - Cut-And-Paste back into dotnetfiddle to keep experimenting.
-                //I'll need to clean up the results but the start of the guts seem to be here.
-                /********************************************************************************
-                {
-                        var html = @"https://www.nordicmuseum.org/about/jobs";
+                var htmlBody = htmlDoc.DocumentNode.SelectSingleNode(query);
+                var htmlChildren= htmlBody.ChildNodes;
 
-                        HtmlWeb web = new HtmlWeb();
-                        
-                        var htmlDoc = web.Load(html);
-                        
-                        var query = "//div[@class='node__content']/div/div/div/div";
-
-                        var htmlBody = htmlDoc.DocumentNode.SelectSingleNode(query);
-                        
-                        var htmlChildren = htmlBody.ChildNodes;
-                        var loopControl = 8;
-                        for(var i = 8; i<= htmlChildren.Count; i+=loopControl) {
-                            Console.WriteLine("i value: "+ i.ToString() );
-                            Console.WriteLine("Title: " + htmlChildren[i-5].InnerHtml);
-                            Console.WriteLine("Description: " + htmlChildren[i-3].InnerHtml);
-                            Console.WriteLine("applink: " + htmlChildren[i-1].InnerHtml);
-                        }
-                    }
-                *********************************************************************************/
-
+                var loopControl = 8;
+                for (var i =loopControl; i<=htmlChildren.Count; i+=loopControl) {
+                    var currentArr = ((i/loopControl) - 1);
+                    nordicJobs.details.Add(new Details());
+                    nordicJobs.details[currentArr].title = htmlChildren[i-5].InnerHtml;
+                    nordicJobs.details[currentArr].description = htmlChildren[i-3].InnerHtml;
+                }
+                nordicJobList.Add(nordicJobs);
             }
             catch (System.Exception e) {
                 JobListing errorMessage = new JobListing();
