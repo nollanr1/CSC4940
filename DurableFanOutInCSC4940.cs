@@ -20,7 +20,8 @@ namespace Company.Function
         static readonly string[] urlList = {
         "https://phh.tbe.taleo.net/phh01/ats/careers/searchResults.jsp?org=SPACENEEDLE&cws=5",
         "https://www.nordicmuseum.org/about/jobs",
-        "https://seattleaquarium.org/careers#openings"/*,
+        "https://seattleaquarium.org/careers#openings",
+        "https://www.virginiav.org/employment/"/*,
         "https://unitedindians.org/about/jobs/",
         "https://www.gatesfoundation.org/about/careers",
         //"https://www.cwb.org/careers", //TODO: MAKE THIS WEBSITE PLAY NICE (STRETCH GOAL) - THROWS 400 ERROR
@@ -34,7 +35,6 @@ namespace Company.Function
         "https://us59.dayforcehcm.com/CandidatePortal/en-US/pacsci",
         "https://seattleartmuseum.applytojob.com/apply",
         "https://thechildrensmuseum.org/visit/contact/job-opportunities/",
-        "https://www.virginiav.org/employment/",
         "https://www.wingluke.org/jobs/",
         "https://www2.appone.com/Search/Search.aspx?ServerVar=WoodlandParkZoo.appone.com&results=yes" //TODO: Bring back the other strings too.
         */
@@ -88,10 +88,11 @@ namespace Company.Function
             BlobClient blobClient = container.GetBlobClient(blobName);
 
             List<JobListing> summatedJobList = new List<JobListing>();
-            //I've found it's best to practice these queries with https://dotnetfiddle.net/fKeTAp
+            //I've found it's best to practice these queries with a seperate, small program I have elsewhere.
             summatedJobList.AddRange(TaleoNetProcessor(parallelTasks[0].Result, log)); //Here's hoping this is the correct way to pass the logger.
             summatedJobList.AddRange(NordicMuseumProcessor(parallelTasks[1].Result, log));
             summatedJobList.AddRange(SeattleAquariumProcessor(parallelTasks[2].Result, log));
+            summatedJobList.AddRange(VirginiaVProcessor(parallelTasks[3].Result, log));
             //TODO: Add the rest of the jobs! Also, see if I can do this async.
             outputs.Add("{\"hosts\": "+ JsonConvert.SerializeObject(summatedJobList) + "}");
 
@@ -277,6 +278,47 @@ namespace Company.Function
                 errorMessage.details[0].description = e.ToString();
                 aquariumJobList.Add(errorMessage);
                 return aquariumJobList;
+            }
+        }
+
+        [FunctionName("VirginiaVProcessor")]
+        public static List<JobListing> VirginiaVProcessor([ActivityTrigger] string incomingHTML, ILogger log)
+        {
+            List<JobListing> virginiaVJobList = new List<JobListing>();
+            var htmlDoc = new HtmlDocument();
+            try {
+                htmlDoc.LoadHtml(incomingHTML);
+                var query = "//div[@class='panel-grid-cell']/div/div/div/h3"; //TODO: Formulate query. I'll grab the titles, then traverse up parent paths to get the rest of the data.
+                var titleNodes = htmlDoc.DocumentNode.SelectNodes(query);
+                if(titleNodes.Count > 0) { //Catching that "no jobs available" edge case... I hope.
+                    JobListing virginiaVJobs = new JobListing();
+                    virginiaVJobs.host = "The Steamer Virginia V Foundation";
+                    foreach(HtmlNode node in titleNodes) {
+                        Details jobDetails = new Details();
+                        jobDetails.title = node.InnerText;
+                        var traversalNode = node.ParentNode.ParentNode.ParentNode.ParentNode.ParentNode; //Now we're at the box that contains all data for a single job.
+                        node.ParentNode.ParentNode.ParentNode.ParentNode.Remove(); //And now there's only one other child - the stuff aside from the title.
+                        traversalNode = traversalNode.FirstChild.FirstChild.FirstChild.FirstChild.NextSibling; //NextSibling due to ::before and ::after elements.
+                        HtmlNodeCollection detailNodes = traversalNode.ChildNodes;
+                        jobDetails.description = detailNodes[1].InnerText;
+                        jobDetails.othernotes = detailNodes[5].InnerText;
+                        jobDetails.emailcontact = detailNodes[5].FirstChild.NextSibling.Attributes["href"].Value;
+                        jobDetails.applink = detailNodes[3].FirstChild.Attributes["href"].Value;
+                        virginiaVJobs.details.Add(jobDetails);
+                    }
+                    virginiaVJobList.Add(virginiaVJobs);
+                }
+                return virginiaVJobList;
+            }
+            catch (System.Exception e) {
+                JobListing errorMessage = new JobListing();
+                errorMessage.host = "Processing Error";
+                errorMessage.details.Add(new Details());
+                errorMessage.details[0].applink = urlList[0];
+                errorMessage.details[0].title = "Error Details";
+                errorMessage.details[0].description = e.ToString();
+                virginiaVJobList.Add(errorMessage);
+                return virginiaVJobList;
             }
         }
 
