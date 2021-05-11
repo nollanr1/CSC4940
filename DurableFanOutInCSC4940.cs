@@ -19,7 +19,8 @@ namespace Company.Function
     {
         static readonly string[] urlList = {
         "https://phh.tbe.taleo.net/phh01/ats/careers/searchResults.jsp?org=SPACENEEDLE&cws=5",
-        "https://www.nordicmuseum.org/about/jobs"/*,
+        "https://www.nordicmuseum.org/about/jobs",
+        "https://seattleaquarium.org/careers#openings"/*,
         "https://unitedindians.org/about/jobs/",
         "https://www.gatesfoundation.org/about/careers",
         //"https://www.cwb.org/careers", //TODO: MAKE THIS WEBSITE PLAY NICE (STRETCH GOAL) - THROWS 400 ERROR
@@ -31,11 +32,10 @@ namespace Company.Function
         "https://mohai.org/about/#opportunities",
         "https://seattleartmuseum.applytojob.com/apply",
         "https://us59.dayforcehcm.com/CandidatePortal/en-US/pacsci",
-        "https://seattleaquarium.org/careers#openings",
         "https://seattleartmuseum.applytojob.com/apply",
         "https://thechildrensmuseum.org/visit/contact/job-opportunities/",
         "https://www.virginiav.org/employment/",
-        "https://wingluke.org/jobs/",
+        "https://www.wingluke.org/jobs/",
         "https://www2.appone.com/Search/Search.aspx?ServerVar=WoodlandParkZoo.appone.com&results=yes" //TODO: Bring back the other strings too.
         */
         };
@@ -91,6 +91,7 @@ namespace Company.Function
             //I've found it's best to practice these queries with https://dotnetfiddle.net/fKeTAp
             summatedJobList.AddRange(TaleoNetProcessor(parallelTasks[0].Result, log)); //Here's hoping this is the correct way to pass the logger.
             summatedJobList.AddRange(NordicMuseumProcessor(parallelTasks[1].Result, log));
+            summatedJobList.AddRange(SeattleAquariumProcessor(parallelTasks[2].Result, log));
             //TODO: Add the rest of the jobs! Also, see if I can do this async.
             outputs.Add("{\"hosts\": "+ JsonConvert.SerializeObject(summatedJobList) + "}");
 
@@ -221,6 +222,62 @@ namespace Company.Function
             }
 
             return nordicJobList;
+        }
+
+        [FunctionName("SeattleAquariumProcessor")]
+        public static List<JobListing> SeattleAquariumProcessor([ActivityTrigger] string incomingHTML, ILogger log)
+        {
+            List<JobListing> aquariumJobList = new List<JobListing>();
+            JobListing aquariumJobs = new JobListing();
+            aquariumJobs.host = "Seattle Aquarium";
+            var htmlDoc = new HtmlDocument();
+            try {
+                htmlDoc.LoadHtml(incomingHTML);
+                var query = "//div[@class='field-sections-basic-page']//div[@class='container']/div[@class='row']//div[@class='clearfix']/div";
+                var jobNodes = htmlDoc.DocumentNode.SelectNodes(query); //Before the jobs, there's six other nodes with this exact pattern that I don't want.
+
+                var i = 0;
+                foreach (HtmlNode node in jobNodes) {
+                    if(i > 5) { //There's six other items matching this description exactly. They always come first so I'll filter them this way.
+                        aquariumJobs.details.Add(new Details());
+                        HtmlNodeCollection subNodes = node.ChildNodes;
+                        aquariumJobs.details[i-6].title = subNodes[1].InnerText;
+                        HtmlNode reverseIterator = subNodes[3].LastChild;
+                        reverseIterator = reverseIterator.PreviousSibling;
+                        aquariumJobs.details[i-6].closebydate = reverseIterator.InnerText + " | "; //This is the date the job posting expires.
+                        reverseIterator = reverseIterator.PreviousSibling;
+                        reverseIterator = reverseIterator.PreviousSibling;
+                        aquariumJobs.details[i-6].closebydate = aquariumJobs.details[i-6].closebydate + reverseIterator.InnerText; //This is the date the job posting needs to be filled by.
+                        reverseIterator = reverseIterator.PreviousSibling;
+                        reverseIterator = reverseIterator.PreviousSibling;
+                        aquariumJobs.details[i-6].othernotes = reverseIterator.InnerText;
+                        aquariumJobs.details[i-6].applink = reverseIterator.ChildNodes[1].Attributes["href"].Value;//I don't like using the absolute call but checking for nulls is causing a crash.
+                        HtmlNode forwardIterator = subNodes[3].FirstChild;
+                        string detailsString = "";
+                        while((forwardIterator != reverseIterator) && (forwardIterator != reverseIterator.NextSibling)) {
+                            detailsString += forwardIterator.InnerText;
+                            forwardIterator = forwardIterator.NextSibling; //I'm including the whitespace because why not.
+                        }
+                        detailsString = detailsString.Replace("&nbsp;", " ");
+                        detailsString = detailsString.Replace("&amp;", "&");
+                        aquariumJobs.details[i-6].description = detailsString;
+                    }
+                    i++;
+                }
+
+                aquariumJobList.Add(aquariumJobs);
+                return aquariumJobList;
+            }
+            catch (System.Exception e) {
+                JobListing errorMessage = new JobListing();
+                errorMessage.host = "Processing Error";
+                errorMessage.details.Add(new Details());
+                errorMessage.details[0].applink = urlList[2];
+                errorMessage.details[0].title = "Error Details";
+                errorMessage.details[0].description = e.ToString();
+                aquariumJobList.Add(errorMessage);
+                return aquariumJobList;
+            }
         }
 
         [FunctionName("DurableFanOutInCSC4940_HttpStart")]
