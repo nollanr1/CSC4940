@@ -21,7 +21,8 @@ namespace Company.Function
         "https://phh.tbe.taleo.net/phh01/ats/careers/searchResults.jsp?org=SPACENEEDLE&cws=5",
         "https://www.nordicmuseum.org/about/jobs",
         "https://seattleaquarium.org/careers#openings",
-        "https://www.virginiav.org/employment/"/*,
+        "https://www.virginiav.org/employment/",
+        "https://seattleartmuseum.applytojob.com/apply"/*,
         "https://unitedindians.org/about/jobs/",
         "https://www.gatesfoundation.org/about/careers",
         //"https://www.cwb.org/careers", //TODO: MAKE THIS WEBSITE PLAY NICE (STRETCH GOAL) - THROWS 400 ERROR
@@ -31,9 +32,7 @@ namespace Company.Function
         "http://jobs.jobvite.com/lcm-plus-labs", //Well, I can't do anything with this one because there's no jobs posted for it right now.
         //"https://recruiting2.ultipro.com/MUS1007MMF", ////TODO: MAKE THIS WEBSITE PLAY NICE (STRETCH GOAL) - CANNOT ESTABLISH SSL CONNECTION (Very long error description.)
         "https://mohai.org/about/#opportunities",
-        "https://seattleartmuseum.applytojob.com/apply",
         "https://us59.dayforcehcm.com/CandidatePortal/en-US/pacsci",
-        "https://seattleartmuseum.applytojob.com/apply",
         "https://thechildrensmuseum.org/visit/contact/job-opportunities/",
         "https://www.wingluke.org/jobs/",
         "https://www2.appone.com/Search/Search.aspx?ServerVar=WoodlandParkZoo.appone.com&results=yes" //TODO: Bring back the other strings too.
@@ -93,6 +92,9 @@ namespace Company.Function
             summatedJobList.AddRange(NordicMuseumProcessor(parallelTasks[1].Result, log));
             summatedJobList.AddRange(SeattleAquariumProcessor(parallelTasks[2].Result, log));
             summatedJobList.AddRange(VirginiaVProcessor(parallelTasks[3].Result, log));
+            //TODO: Make the following program follow the job links to retrieve details.
+            //This'll be a stretch goal, and should be retrofittable into the base product.
+            summatedJobList.AddRange(SeaArtMuseumProcessor(parallelTasks[4].Result, log));
             //TODO: Add the rest of the jobs! Also, see if I can do this async.
             outputs.Add("{\"hosts\": "+ JsonConvert.SerializeObject(summatedJobList) + "}");
 
@@ -288,7 +290,7 @@ namespace Company.Function
             var htmlDoc = new HtmlDocument();
             try {
                 htmlDoc.LoadHtml(incomingHTML);
-                var query = "//div[@class='panel-grid-cell']/div/div/div/h3"; //TODO: Formulate query. I'll grab the titles, then traverse up parent paths to get the rest of the data.
+                var query = "//div[@class='panel-grid-cell']/div/div/div/h3"; //Grab the titles, then traverse up parent paths to get the rest of the data.
                 var titleNodes = htmlDoc.DocumentNode.SelectNodes(query);
                 if(titleNodes.Count > 0) { //Catching that "no jobs available" edge case... I hope.
                     JobListing virginiaVJobs = new JobListing();
@@ -319,6 +321,41 @@ namespace Company.Function
                 errorMessage.details[0].description = e.ToString();
                 virginiaVJobList.Add(errorMessage);
                 return virginiaVJobList;
+            }
+        }
+
+        [FunctionName("SeaArtMuseumProcessor")]
+        public static List<JobListing> SeaArtMuseumProcessor([ActivityTrigger] string incomingHTML, ILogger log)
+        {
+            List<JobListing> seaArtJobList = new List<JobListing>();
+            var htmlDoc = new HtmlDocument();
+            try {
+                htmlDoc.LoadHtml(incomingHTML);
+                var query = "//ul[@class='list-group']/li[@class='list-group-item']/h4[@class='list-group-item-heading']"; //V1.0 will just grab the titles and links without following the links for more details.
+                var linkNodes = htmlDoc.DocumentNode.SelectNodes(query);
+                if(linkNodes.Count > 0) { //Catching that "no jobs available" edge case... I hope.
+                    JobListing seaArtJobs = new JobListing();
+                    seaArtJobs.host = "Seattle Art Museum";
+                    foreach(HtmlNode node in linkNodes) {
+                        Details titleAndHref = new Details();
+                        HtmlNode targetNode = node.FirstChild.NextSibling;
+                        titleAndHref.title = targetNode.InnerText.Trim();
+                        titleAndHref.applink = targetNode.Attributes["href"].Value;
+                        seaArtJobs.details.Add(titleAndHref); //A v2.0 would follow this href to get more details.
+                    }
+                    seaArtJobList.Add(seaArtJobs);
+                }
+                return seaArtJobList;
+            }
+            catch (System.Exception e) {
+                JobListing errorMessage = new JobListing();
+                errorMessage.host = "Processing Error";
+                errorMessage.details.Add(new Details());
+                errorMessage.details[0].applink = urlList[0];
+                errorMessage.details[0].title = "Error Details";
+                errorMessage.details[0].description = e.ToString();
+                seaArtJobList.Add(errorMessage);
+                return seaArtJobList;
             }
         }
 
