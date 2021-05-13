@@ -22,11 +22,11 @@ namespace Company.Function
         "https://www.nordicmuseum.org/about/jobs",
         "https://seattleaquarium.org/careers#openings",
         "https://www.virginiav.org/employment/",
-        "https://seattleartmuseum.applytojob.com/apply"/*,
-        "https://unitedindians.org/about/jobs/",
+        "https://seattleartmuseum.applytojob.com/apply",
+        "https://mopop.org/about-mopop/get-involved/join-the-team/"/*,
+        "https://www.unitedindians.org/about/jobs/",
         "https://www.gatesfoundation.org/about/careers",
         //"https://www.cwb.org/careers", //TODO: MAKE THIS WEBSITE PLAY NICE (STRETCH GOAL) - THROWS 400 ERROR
-        "https://mopop.org/about-mopop/get-involved/join-the-team/",
         "https://fryemuseum.org/employment/",
         "https://henryart.org/about/opportunities#page-navigation-jobs",
         "http://jobs.jobvite.com/lcm-plus-labs", //Well, I can't do anything with this one because there's no jobs posted for it right now.
@@ -95,6 +95,7 @@ namespace Company.Function
             //TODO: Make the following program follow the job links to retrieve details.
             //This'll be a stretch goal, and should be retrofittable into the base product.
             summatedJobList.AddRange(SeaArtMuseumProcessor(parallelTasks[4].Result, log));
+            summatedJobList.AddRange(MoPopProcessor(parallelTasks[5].Result, log));
             //TODO: Add the rest of the jobs! Also, see if I can do this async.
             outputs.Add("{\"hosts\": "+ JsonConvert.SerializeObject(summatedJobList) + "}");
 
@@ -316,7 +317,7 @@ namespace Company.Function
                 JobListing errorMessage = new JobListing();
                 errorMessage.host = "Processing Error";
                 errorMessage.details.Add(new Details());
-                errorMessage.details[0].applink = urlList[0];
+                errorMessage.details[0].applink = urlList[3];
                 errorMessage.details[0].title = "Error Details";
                 errorMessage.details[0].description = e.ToString();
                 virginiaVJobList.Add(errorMessage);
@@ -351,11 +352,45 @@ namespace Company.Function
                 JobListing errorMessage = new JobListing();
                 errorMessage.host = "Processing Error";
                 errorMessage.details.Add(new Details());
-                errorMessage.details[0].applink = urlList[0];
+                errorMessage.details[0].applink = urlList[4];
                 errorMessage.details[0].title = "Error Details";
                 errorMessage.details[0].description = e.ToString();
                 seaArtJobList.Add(errorMessage);
                 return seaArtJobList;
+            }
+        }
+
+        [FunctionName("MoPopProcessor")]
+        public static List<JobListing> MoPopProcessor([ActivityTrigger] string incomingHTML, ILogger log)
+        {
+            List<JobListing> moPopJobList = new List<JobListing>();
+            var htmlDoc = new HtmlDocument();
+            try {
+                htmlDoc.LoadHtml(incomingHTML);
+                var query = "//text()[contains(., 'Employment')]/../.."; //Select the parent two levels up from the "Employment" text
+                var employmentNode = htmlDoc.DocumentNode.SelectSingleNode(query);
+                var employmentNodeCollection = employmentNode.ChildNodes;
+                var lim = (employmentNodeCollection.Count - 10);//There are nine nodes we don't want. Minus an extra for array position zero.
+                JobListing moPopJobs = new JobListing();
+                moPopJobs.host = "MoPOP - Museum of Pop Culture";
+                for(int i = 3; i<=lim; i+=2) { //Even nodes are blank, node 1 is the header, last nine nodes are boilerplate.
+                    Details linkAndTitle = new Details();
+                    linkAndTitle.title = employmentNodeCollection[i].InnerText;
+                    linkAndTitle.applink = employmentNodeCollection[i].FirstChild.Attributes["href"].Value;
+                    moPopJobs.details.Add(linkAndTitle);
+                }
+                moPopJobList.Add(moPopJobs);
+                return moPopJobList;
+            }
+            catch (System.Exception e) {
+                JobListing errorMessage = new JobListing();
+                errorMessage.host = "Processing Error";
+                errorMessage.details.Add(new Details());
+                errorMessage.details[0].applink = urlList[5];
+                errorMessage.details[0].title = "Error Details";
+                errorMessage.details[0].description = e.ToString();
+                moPopJobList.Add(errorMessage);
+                return moPopJobList;
             }
         }
 
