@@ -23,11 +23,11 @@ namespace Company.Function
         "https://seattleaquarium.org/careers#openings",
         "https://www.virginiav.org/employment/",
         "https://seattleartmuseum.applytojob.com/apply",
-        "https://mopop.org/about-mopop/get-involved/join-the-team/"/*,
+        "https://mopop.org/about-mopop/get-involved/join-the-team/",
+        "https://fryemuseum.org/employment/"/*,
         "https://www.unitedindians.org/about/jobs/",
         "https://www.gatesfoundation.org/about/careers",
         //"https://www.cwb.org/careers", //TODO: MAKE THIS WEBSITE PLAY NICE (STRETCH GOAL) - THROWS 400 ERROR
-        "https://fryemuseum.org/employment/",
         "https://henryart.org/about/opportunities#page-navigation-jobs",
         "http://jobs.jobvite.com/lcm-plus-labs", //Well, I can't do anything with this one because there's no jobs posted for it right now.
         //"https://recruiting2.ultipro.com/MUS1007MMF", ////TODO: MAKE THIS WEBSITE PLAY NICE (STRETCH GOAL) - CANNOT ESTABLISH SSL CONNECTION (Very long error description.)
@@ -96,6 +96,7 @@ namespace Company.Function
             //This'll be a stretch goal, and should be retrofittable into the base product.
             summatedJobList.AddRange(SeaArtMuseumProcessor(parallelTasks[4].Result, log));
             summatedJobList.AddRange(MoPopProcessor(parallelTasks[5].Result, log));
+            summatedJobList.AddRange(FryeMuseumProcessor(parallelTasks[6].Result, log));
             //TODO: Add the rest of the jobs! Also, see if I can do this async.
             outputs.Add("{\"hosts\": "+ JsonConvert.SerializeObject(summatedJobList) + "}");
 
@@ -391,6 +392,38 @@ namespace Company.Function
                 errorMessage.details[0].description = e.ToString();
                 moPopJobList.Add(errorMessage);
                 return moPopJobList;
+            }
+        }
+
+        [FunctionName("FryeMuseumProcessor")]
+        public static List<JobListing> FryeMuseumProcessor([ActivityTrigger] string incomingHTML, ILogger log)
+        {
+            List<JobListing> fryeJobList = new List<JobListing>();
+            var htmlDoc = new HtmlDocument();
+            try {
+                htmlDoc.LoadHtml(incomingHTML);
+                var query = "//div[@class='col75 center']/a"; //Selects the links directly, easy-peasy... For once. Nicest HTML I've seen yet. It's even commented!
+                var jobLinkNodes = htmlDoc.DocumentNode.SelectNodes(query);
+                JobListing fryeJobs = new JobListing();
+                fryeJobs.host = "Frye Art Museum";
+                foreach(HtmlNode node in jobLinkNodes) {
+                    Details fryeDetails = new Details();
+                    fryeDetails.applink = node.Attributes["href"].Value;
+                    fryeDetails.title = node.InnerText;
+                    fryeJobs.details.Add(fryeDetails);
+                }
+                fryeJobList.Add(fryeJobs);
+                return fryeJobList;
+            }
+            catch (System.Exception e) {
+                JobListing errorMessage = new JobListing();
+                errorMessage.host = "Processing Error";
+                errorMessage.details.Add(new Details());
+                errorMessage.details[0].applink = urlList[6];
+                errorMessage.details[0].title = "Error Details";
+                errorMessage.details[0].description = e.ToString();
+                fryeJobList.Add(errorMessage);
+                return fryeJobList;
             }
         }
 
