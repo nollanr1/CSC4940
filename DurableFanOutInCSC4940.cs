@@ -24,11 +24,11 @@ namespace Company.Function
         "https://www.virginiav.org/employment/",
         "https://seattleartmuseum.applytojob.com/apply",
         "https://mopop.org/about-mopop/get-involved/join-the-team/",
-        "https://fryemuseum.org/employment/"/*,
+        "https://fryemuseum.org/employment/",
+        "https://henryart.org/about/opportunities"/*,
         "https://www.unitedindians.org/about/jobs/",
         "https://www.gatesfoundation.org/about/careers",
         //"https://www.cwb.org/careers", //TODO: MAKE THIS WEBSITE PLAY NICE (STRETCH GOAL) - THROWS 400 ERROR
-        "https://henryart.org/about/opportunities#page-navigation-jobs",
         "http://jobs.jobvite.com/lcm-plus-labs", //Well, I can't do anything with this one because there's no jobs posted for it right now.
         //"https://recruiting2.ultipro.com/MUS1007MMF", ////TODO: MAKE THIS WEBSITE PLAY NICE (STRETCH GOAL) - CANNOT ESTABLISH SSL CONNECTION (Very long error description.)
         "https://mohai.org/about/#opportunities",
@@ -97,6 +97,7 @@ namespace Company.Function
             summatedJobList.AddRange(SeaArtMuseumProcessor(parallelTasks[4].Result, log));
             summatedJobList.AddRange(MoPopProcessor(parallelTasks[5].Result, log));
             summatedJobList.AddRange(FryeMuseumProcessor(parallelTasks[6].Result, log));
+            summatedJobList.AddRange(HenryArtProcessor(parallelTasks[7].Result, log)); //This actually doesn't need to follow links, unless I get a PDF reader...
             //TODO: Add the rest of the jobs! Also, see if I can do this async.
             outputs.Add("{\"hosts\": "+ JsonConvert.SerializeObject(summatedJobList) + "}");
 
@@ -424,6 +425,45 @@ namespace Company.Function
                 errorMessage.details[0].description = e.ToString();
                 fryeJobList.Add(errorMessage);
                 return fryeJobList;
+            }
+        }
+
+        [FunctionName("HenryArtProcessor")]
+        public static List<JobListing> HenryArtProcessor([ActivityTrigger] string incomingHTML, ILogger log)
+        {
+            List<JobListing> henryJobList = new List<JobListing>();
+            var htmlDoc = new HtmlDocument();
+            try {
+                htmlDoc.LoadHtml(incomingHTML);
+                var query = "//div[@id='page-navigation-jobs']/div/div/div/ul/li";
+                var otherDataQuery ="//div[@id='page-navigation-jobs']/div/div/div/p";
+                var emailQuery ="//div[@id='page-navigation-jobs']/div/div/div/p/a";
+                var jobNodes = htmlDoc.DocumentNode.SelectNodes(query);
+                var otherDataNode = htmlDoc.DocumentNode.SelectNodes(otherDataQuery);
+                string emailString = htmlDoc.DocumentNode.SelectSingleNode(emailQuery).Attributes["href"].Value;
+                string otherDataString = otherDataNode[0].InnerText.Trim() + " " + otherDataNode[2].InnerText.Trim();
+                JobListing henryJobs = new JobListing();
+                henryJobs.host = "Henry Art Gallery";
+                foreach(HtmlNode node in jobNodes) {
+                    Details henryDetails = new Details();
+                    henryDetails.applink = node.LastChild.Attributes["href"].Value; //Because of some invisible inline links...
+                    henryDetails.title = node.InnerText;
+                    henryDetails.othernotes = otherDataString;
+                    henryDetails.emailcontact = otherDataString;
+                    henryJobs.details.Add(henryDetails);
+                }
+                henryJobList.Add(henryJobs);
+                return henryJobList;
+            }
+            catch (System.Exception e) {
+                JobListing errorMessage = new JobListing();
+                errorMessage.host = "Processing Error";
+                errorMessage.details.Add(new Details());
+                errorMessage.details[0].applink = urlList[7];
+                errorMessage.details[0].title = "Error Details";
+                errorMessage.details[0].description = e.ToString();
+                henryJobList.Add(errorMessage);
+                return henryJobList;
             }
         }
 
