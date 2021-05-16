@@ -26,14 +26,14 @@ namespace Company.Function
         "https://mopop.org/about-mopop/get-involved/join-the-team/",
         "https://fryemuseum.org/employment/",
         "https://henryart.org/about/opportunities",
-        "https://mohai.org/about/#opportunities"/*,
+        "https://mohai.org/about/#opportunities",
+        "https://thechildrensmuseum.org/visit/contact/job-opportunities/"/*,
         "https://www.unitedindians.org/about/jobs/",
         "https://www.gatesfoundation.org/about/careers",
         //"https://www.cwb.org/careers", //TODO: MAKE THIS WEBSITE PLAY NICE (STRETCH GOAL) - THROWS 400 ERROR
         "http://jobs.jobvite.com/lcm-plus-labs", //Well, I can't do anything with this one because there's no jobs posted for it right now.
         //"https://recruiting2.ultipro.com/MUS1007MMF", ////TODO: MAKE THIS WEBSITE PLAY NICE (STRETCH GOAL) - CANNOT ESTABLISH SSL CONNECTION (Very long error description.)
         "https://us59.dayforcehcm.com/CandidatePortal/en-US/pacsci",
-        "https://thechildrensmuseum.org/visit/contact/job-opportunities/",
         "https://www.wingluke.org/jobs/",
         "https://www2.appone.com/Search/Search.aspx?ServerVar=WoodlandParkZoo.appone.com&results=yes" //TODO: Bring back the other strings too.
         */
@@ -99,6 +99,7 @@ namespace Company.Function
             summatedJobList.AddRange(FryeMuseumProcessor(parallelTasks[6].Result, log));
             summatedJobList.AddRange(HenryArtProcessor(parallelTasks[7].Result, log)); //This actually doesn't need to follow links, unless I get a PDF reader...
             summatedJobList.AddRange(MohaiProcessor(parallelTasks[8].Result, log));
+            summatedJobList.AddRange(ChildrensMuseumProcessor(parallelTasks[9].Result, log)); //This is a full processor, not a slim one - so it's as done as it can be. No links to follow.
             //TODO: Add the rest of the jobs! Also, see if I can do this async.
             outputs.Add("{\"hosts\": "+ JsonConvert.SerializeObject(summatedJobList) + "}");
 
@@ -497,6 +498,43 @@ namespace Company.Function
                 errorMessage.details[0].description = e.ToString();
                 MohaiJobList.Add(errorMessage);
                 return MohaiJobList;
+            }
+        }
+
+        [FunctionName("ChildrensMuseumProcessor")]
+        public static List<JobListing> ChildrensMuseumProcessor([ActivityTrigger] string incomingHTML, ILogger log)
+        {
+            List<JobListing> cMuseumJobList = new List<JobListing>();
+            var htmlDoc = new HtmlDocument();
+            try {
+                htmlDoc.LoadHtml(incomingHTML);
+                var query = "//strong/text()[contains(., 'Job Status:')]/../../.."; //This selects jobs... hopefully all of them, regardless of how the html splits them.
+                var splitQuery = "./p"; //But since they've only had one posting for a year now, it's hard to tell how they'd format multiple.
+                var jobNodes = htmlDoc.DocumentNode.SelectNodes(query);
+                JobListing cMuseumJobs = new JobListing();
+                cMuseumJobs.host = "Seattle Children's Museum";
+                foreach(HtmlNode node in jobNodes) {
+                    Details cMuseumDetails = new Details();
+                    var splitJob = node.SelectNodes(splitQuery);
+                    cMuseumDetails.title = splitJob[0].InnerText;
+                    cMuseumDetails.othernotes = splitJob[1].InnerText + " | " + splitJob[3].InnerText;
+                    cMuseumDetails.salary = splitJob[2].LastChild.InnerText;
+                    cMuseumDetails.description = splitJob[6].InnerText + " " +splitJob[8].InnerText;
+                    cMuseumDetails.applink = urlList[9]; //The application form is baked into the page.
+                    cMuseumJobs.details.Add(cMuseumDetails);
+                }
+                cMuseumJobList.Add(cMuseumJobs);
+                return cMuseumJobList;
+            }
+            catch (System.Exception e) {
+                JobListing errorMessage = new JobListing();
+                errorMessage.host = "Processing Error";
+                errorMessage.details.Add(new Details());
+                errorMessage.details[0].applink = urlList[9];
+                errorMessage.details[0].title = "Error Details";
+                errorMessage.details[0].description = e.ToString();
+                cMuseumJobList.Add(errorMessage);
+                return cMuseumJobList;
             }
         }
 
