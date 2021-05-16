@@ -25,13 +25,13 @@ namespace Company.Function
         "https://seattleartmuseum.applytojob.com/apply",
         "https://mopop.org/about-mopop/get-involved/join-the-team/",
         "https://fryemuseum.org/employment/",
-        "https://henryart.org/about/opportunities"/*,
+        "https://henryart.org/about/opportunities",
+        "https://mohai.org/about/#opportunities"/*,
         "https://www.unitedindians.org/about/jobs/",
         "https://www.gatesfoundation.org/about/careers",
         //"https://www.cwb.org/careers", //TODO: MAKE THIS WEBSITE PLAY NICE (STRETCH GOAL) - THROWS 400 ERROR
         "http://jobs.jobvite.com/lcm-plus-labs", //Well, I can't do anything with this one because there's no jobs posted for it right now.
         //"https://recruiting2.ultipro.com/MUS1007MMF", ////TODO: MAKE THIS WEBSITE PLAY NICE (STRETCH GOAL) - CANNOT ESTABLISH SSL CONNECTION (Very long error description.)
-        "https://mohai.org/about/#opportunities",
         "https://us59.dayforcehcm.com/CandidatePortal/en-US/pacsci",
         "https://thechildrensmuseum.org/visit/contact/job-opportunities/",
         "https://www.wingluke.org/jobs/",
@@ -98,6 +98,7 @@ namespace Company.Function
             summatedJobList.AddRange(MoPopProcessor(parallelTasks[5].Result, log));
             summatedJobList.AddRange(FryeMuseumProcessor(parallelTasks[6].Result, log));
             summatedJobList.AddRange(HenryArtProcessor(parallelTasks[7].Result, log)); //This actually doesn't need to follow links, unless I get a PDF reader...
+            summatedJobList.AddRange(MohaiProcessor(parallelTasks[8].Result, log));
             //TODO: Add the rest of the jobs! Also, see if I can do this async.
             outputs.Add("{\"hosts\": "+ JsonConvert.SerializeObject(summatedJobList) + "}");
 
@@ -464,6 +465,38 @@ namespace Company.Function
                 errorMessage.details[0].description = e.ToString();
                 henryJobList.Add(errorMessage);
                 return henryJobList;
+            }
+        }
+
+        [FunctionName("MohaiProcessor")]
+        public static List<JobListing> MohaiProcessor([ActivityTrigger] string incomingHTML, ILogger log)
+        {
+            List<JobListing> MohaiJobList = new List<JobListing>();
+            var htmlDoc = new HtmlDocument();
+            try {
+                htmlDoc.LoadHtml(incomingHTML);
+                var query = "//dl/dd/p/text()[contains(., 'Current employment opportunities at MOHAI:')]/../../p/a"; //This filters out unpaid positions.
+                var jobNodes = htmlDoc.DocumentNode.SelectNodes(query);
+                JobListing mohaiJobs = new JobListing();
+                mohaiJobs.host = "MOHAI";
+                foreach(HtmlNode node in jobNodes) {
+                    Details mohaiDetails = new Details();
+                    mohaiDetails.title = node.InnerText;
+                    mohaiDetails.applink = node.Attributes["href"].Value;
+                    mohaiJobs.details.Add(mohaiDetails);
+                }
+                MohaiJobList.Add(mohaiJobs);
+                return MohaiJobList;
+            }
+            catch (System.Exception e) {
+                JobListing errorMessage = new JobListing();
+                errorMessage.host = "Processing Error";
+                errorMessage.details.Add(new Details());
+                errorMessage.details[0].applink = urlList[8];
+                errorMessage.details[0].title = "Error Details";
+                errorMessage.details[0].description = e.ToString();
+                MohaiJobList.Add(errorMessage);
+                return MohaiJobList;
             }
         }
 
