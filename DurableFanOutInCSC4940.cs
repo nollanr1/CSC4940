@@ -27,14 +27,14 @@ namespace Company.Function
         "https://fryemuseum.org/employment/",
         "https://henryart.org/about/opportunities",
         "https://mohai.org/about/#opportunities",
-        "https://thechildrensmuseum.org/visit/contact/job-opportunities/"/*,
+        "https://thechildrensmuseum.org/visit/contact/job-opportunities/",
+        "https://www.wingluke.org/jobs/"/*,
         "https://www.unitedindians.org/about/jobs/",
         "https://www.gatesfoundation.org/about/careers",
         //"https://www.cwb.org/careers", //TODO: MAKE THIS WEBSITE PLAY NICE (STRETCH GOAL) - THROWS 400 ERROR
         "http://jobs.jobvite.com/lcm-plus-labs", //Well, I can't do anything with this one because there's no jobs posted for it right now.
         //"https://recruiting2.ultipro.com/MUS1007MMF", ////TODO: MAKE THIS WEBSITE PLAY NICE (STRETCH GOAL) - CANNOT ESTABLISH SSL CONNECTION (Very long error description.)
-        "https://us59.dayforcehcm.com/CandidatePortal/en-US/pacsci",
-        "https://www.wingluke.org/jobs/",
+        "https://us59.dayforcehcm.com/CandidatePortal/en-US/pacsci", //I can't access this website because my ISP is man-in-the-middling me. No, really.
         "https://www2.appone.com/Search/Search.aspx?ServerVar=WoodlandParkZoo.appone.com&results=yes" //TODO: Bring back the other strings too.
         */
         };
@@ -100,6 +100,7 @@ namespace Company.Function
             summatedJobList.AddRange(HenryArtProcessor(parallelTasks[7].Result, log)); //This actually doesn't need to follow links, unless I get a PDF reader...
             summatedJobList.AddRange(MohaiProcessor(parallelTasks[8].Result, log));
             summatedJobList.AddRange(ChildrensMuseumProcessor(parallelTasks[9].Result, log)); //This is a full processor, not a slim one - so it's as done as it can be. No links to follow.
+            summatedJobList.AddRange(WingLukeProcessor(parallelTasks[10].Result, log)); //This actually doesn't need to follow links, unless I get a PDF reader...
             //TODO: Add the rest of the jobs! Also, see if I can do this async.
             outputs.Add("{\"hosts\": "+ JsonConvert.SerializeObject(summatedJobList) + "}");
 
@@ -535,6 +536,41 @@ namespace Company.Function
                 errorMessage.details[0].description = e.ToString();
                 cMuseumJobList.Add(errorMessage);
                 return cMuseumJobList;
+            }
+        }
+
+        [FunctionName("WingLukeProcessor")]
+        public static List<JobListing> WingLukeProcessor([ActivityTrigger] string incomingHTML, ILogger log)
+        {
+            List<JobListing> LukeJobList = new List<JobListing>();
+            var htmlDoc = new HtmlDocument();
+            try {
+                htmlDoc.LoadHtml(incomingHTML);
+                var query = "//article/section/ul/li";
+                var jobNodes = htmlDoc.DocumentNode.SelectNodes(query);
+                JobListing lukeJobs = new JobListing();
+                lukeJobs.host = "Wing Luke Museum of the Asian Pacific American Experience";
+                foreach(HtmlNode node in jobNodes) {
+                    Details lukeDetails = new Details();
+                    lukeDetails.title = node.FirstChild.InnerText;
+                    lukeDetails.applink = node.FirstChild.Attributes["href"].Value;
+                    if(node.ChildNodes.Count > 1) {
+                        lukeDetails.othernotes = node.LastChild.Attributes["href"].Value; //The Wing Luke website stores "addtional information" as A LINK TO A PDF. Good heavens.
+                    }
+                    lukeJobs.details.Add(lukeDetails);
+                }
+                LukeJobList.Add(lukeJobs);
+                return LukeJobList;
+            }
+            catch (System.Exception e) {
+                JobListing errorMessage = new JobListing();
+                errorMessage.host = "Processing Error";
+                errorMessage.details.Add(new Details());
+                errorMessage.details[0].applink = urlList[10];
+                errorMessage.details[0].title = "Error Details";
+                errorMessage.details[0].description = e.ToString();
+                LukeJobList.Add(errorMessage);
+                return LukeJobList;
             }
         }
 
