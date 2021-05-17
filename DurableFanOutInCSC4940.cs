@@ -28,14 +28,14 @@ namespace Company.Function
         "https://henryart.org/about/opportunities",
         "https://mohai.org/about/#opportunities",
         "https://thechildrensmuseum.org/visit/contact/job-opportunities/",
-        "https://www.wingluke.org/jobs/"/*,
+        "https://www.wingluke.org/jobs/",
+        "https://www2.appone.com/Search/Search.aspx?ServerVar=WoodlandParkZoo.appone.com&results=yes"/*,
         "https://www.unitedindians.org/about/jobs/",
         "https://www.gatesfoundation.org/about/careers",
         //"https://www.cwb.org/careers", //TODO: MAKE THIS WEBSITE PLAY NICE (STRETCH GOAL) - THROWS 400 ERROR
         "http://jobs.jobvite.com/lcm-plus-labs", //Well, I can't do anything with this one because there's no jobs posted for it right now.
         //"https://recruiting2.ultipro.com/MUS1007MMF", ////TODO: MAKE THIS WEBSITE PLAY NICE (STRETCH GOAL) - CANNOT ESTABLISH SSL CONNECTION (Very long error description.)
         "https://us59.dayforcehcm.com/CandidatePortal/en-US/pacsci", //I can't access this website because my ISP is man-in-the-middling me. No, really.
-        "https://www2.appone.com/Search/Search.aspx?ServerVar=WoodlandParkZoo.appone.com&results=yes" //TODO: Bring back the other strings too.
         */
         };
         static readonly string containerName = "scrapeddata";
@@ -101,6 +101,7 @@ namespace Company.Function
             summatedJobList.AddRange(MohaiProcessor(parallelTasks[8].Result, log));
             summatedJobList.AddRange(ChildrensMuseumProcessor(parallelTasks[9].Result, log)); //This is a full processor, not a slim one - so it's as done as it can be. No links to follow.
             summatedJobList.AddRange(WingLukeProcessor(parallelTasks[10].Result, log)); //This actually doesn't need to follow links, unless I get a PDF reader...
+            summatedJobList.AddRange(ParkZooProcessor(parallelTasks[11].Result, log));
             //TODO: Add the rest of the jobs! Also, see if I can do this async.
             outputs.Add("{\"hosts\": "+ JsonConvert.SerializeObject(summatedJobList) + "}");
 
@@ -571,6 +572,45 @@ namespace Company.Function
                 errorMessage.details[0].description = e.ToString();
                 LukeJobList.Add(errorMessage);
                 return LukeJobList;
+            }
+        }
+
+        [FunctionName("ParkZooProcessor")]
+        public static List<JobListing> ParkZooProcessor([ActivityTrigger] string incomingHTML, ILogger log)
+        {
+            List<JobListing> zooJobList = new List<JobListing>();
+            var htmlDoc = new HtmlDocument();
+            try {
+                htmlDoc.LoadHtml(incomingHTML);
+                var query = "//div[@id='cphBody_UpdatePanelReqs']/table[@class='tableContent list']/tr"; //There's just... no table body?
+                var jobNodes = htmlDoc.DocumentNode.SelectNodes(query);
+                JobListing zooJobs = new JobListing();
+                zooJobs.host = "Woodland Park Zoo";
+                string departmentString = "";
+                foreach(HtmlNode node in jobNodes) {
+                    if(node.Attributes["class"] != null) {
+                        departmentString = node.InnerText;
+                    }
+                    else {
+                        Details zooDetails = new Details();
+                        zooDetails.title = departmentString + " | " + node.FirstChild.NextSibling.InnerText;
+                        zooDetails.applink = node.FirstChild.NextSibling.FirstChild.FirstChild.Attributes["href"].Value;
+                        zooDetails.othernotes = ("Location: " + node.FirstChild.NextSibling.NextSibling.NextSibling.InnerText);
+                        zooJobs.details.Add(zooDetails);
+                    }
+                }
+                zooJobList.Add(zooJobs);
+                return zooJobList;
+            }
+            catch (System.Exception e) {
+                JobListing errorMessage = new JobListing();
+                errorMessage.host = "Processing Error";
+                errorMessage.details.Add(new Details());
+                errorMessage.details[0].applink = urlList[11];
+                errorMessage.details[0].title = "Error Details";
+                errorMessage.details[0].description = e.ToString();
+                zooJobList.Add(errorMessage);
+                return zooJobList;
             }
         }
 
