@@ -31,9 +31,9 @@ namespace Company.Function
         "https://www.wingluke.org/jobs/",
         "https://www2.appone.com/Search/Search.aspx?ServerVar=WoodlandParkZoo.appone.com&results=yes",
         "https://www.unitedindians.org/about/jobs/"/*,
-        "https://www.gatesfoundation.org/about/careers",
+        "https://www.gatesfoundation.org/about/careers", //I'll need to ask the client about filtering these down... Don't think he's interested in biotech modeling. Or working in Nigeria.
         //"https://www.cwb.org/careers", //TODO: MAKE THIS WEBSITE PLAY NICE (STRETCH GOAL) - THROWS 400 ERROR
-        "http://jobs.jobvite.com/lcm-plus-labs", //Well, I can't do anything with this one because there's no jobs posted for it right now.
+        "http://jobs.jobvite.com/lcm-plus-labs", //Well, I can't do anything with this one because there's no jobs posted for it right now. (And there never are, according to archive.org...)
         //"https://recruiting2.ultipro.com/MUS1007MMF", ////TODO: MAKE THIS WEBSITE PLAY NICE (STRETCH GOAL) - CANNOT ESTABLISH SSL CONNECTION (Very long error description.)
         "https://us59.dayforcehcm.com/CandidatePortal/en-US/pacsci", //I can't access this website because my ISP is man-in-the-middling me. No, really.
         */
