@@ -29,8 +29,8 @@ namespace Company.Function
         "https://mohai.org/about/#opportunities",
         "https://thechildrensmuseum.org/visit/contact/job-opportunities/",
         "https://www.wingluke.org/jobs/",
-        "https://www2.appone.com/Search/Search.aspx?ServerVar=WoodlandParkZoo.appone.com&results=yes"/*,
-        "https://www.unitedindians.org/about/jobs/",
+        "https://www2.appone.com/Search/Search.aspx?ServerVar=WoodlandParkZoo.appone.com&results=yes",
+        "https://www.unitedindians.org/about/jobs/"/*,
         "https://www.gatesfoundation.org/about/careers",
         //"https://www.cwb.org/careers", //TODO: MAKE THIS WEBSITE PLAY NICE (STRETCH GOAL) - THROWS 400 ERROR
         "http://jobs.jobvite.com/lcm-plus-labs", //Well, I can't do anything with this one because there's no jobs posted for it right now.
@@ -50,6 +50,7 @@ namespace Company.Function
             public string description = null;
             public string othernotes = null;
             public string emailcontact = null;
+            public string extradoc = null;
         }
         public class JobListing
         {
@@ -102,6 +103,7 @@ namespace Company.Function
             summatedJobList.AddRange(ChildrensMuseumProcessor(parallelTasks[9].Result, log)); //This is a full processor, not a slim one - so it's as done as it can be. No links to follow.
             summatedJobList.AddRange(WingLukeProcessor(parallelTasks[10].Result, log)); //This actually doesn't need to follow links, unless I get a PDF reader...
             summatedJobList.AddRange(ParkZooProcessor(parallelTasks[11].Result, log));
+            summatedJobList.AddRange(UnitedIndiansProcessor(parallelTasks[12].Result, log));
             //TODO: Add the rest of the jobs! Also, see if I can do this async.
             outputs.Add("{\"hosts\": "+ JsonConvert.SerializeObject(summatedJobList) + "}");
 
@@ -611,6 +613,61 @@ namespace Company.Function
                 errorMessage.details[0].description = e.ToString();
                 zooJobList.Add(errorMessage);
                 return zooJobList;
+            }
+        }
+
+        [FunctionName("UnitedIndiansProcessor")]
+        public static List<JobListing> UnitedIndiansProcessor([ActivityTrigger] string incomingHTML, ILogger log)
+        {
+            List<JobListing> unitedJobList = new List<JobListing>();
+            var htmlDoc = new HtmlDocument();
+            string hostName = "United Indians of All Tribes Foundation";
+            try {
+                htmlDoc.LoadHtml(incomingHTML);
+
+                var othernotesQuery = "//main[@id='main']/article/div/p/a";
+                var additionalInfoNode = htmlDoc.DocumentNode.SelectNodes(othernotesQuery)[1];
+                string additionalDocumentLink = additionalInfoNode.Attributes["href"].Value;
+                additionalInfoNode = additionalInfoNode.ParentNode;
+                string otherNotes = additionalInfoNode.InnerText;
+                additionalInfoNode = additionalInfoNode.NextSibling.NextSibling.LastChild;
+                string emailContact = htmlDoc.DocumentNode.SelectSingleNode(othernotesQuery).InnerText;
+                otherNotes += " " + emailContact;
+                emailContact = "mailto:" + emailContact;
+
+                var query = "//main[@id='main']/article/div/ul";
+                var hostNodes = htmlDoc.DocumentNode.SelectNodes(query);
+                string locationString = "";
+                foreach(HtmlNode hostNode in hostNodes) {
+                    locationString = hostNode.PreviousSibling.PreviousSibling.InnerText.TrimEnd(':');
+                    JobListing unitedJobs = new JobListing();
+                    unitedJobs.host = hostName + " (" + locationString + ")";
+                    foreach(HtmlNode jobNode in hostNode.ChildNodes) {
+                        if(jobNode.HasChildNodes) {
+                            Details jobDetails = new Details();
+                            jobDetails.applink = jobNode.FirstChild.Attributes["href"].Value;
+                            jobDetails.title = jobNode.FirstChild.InnerText;
+                            jobDetails.othernotes = otherNotes;
+                            jobDetails.emailcontact = emailContact;
+                            jobDetails.extradoc = additionalDocumentLink; //Fie on this org for making me add this field just for them.
+                            unitedJobs.details.Add(jobDetails);
+                        }
+                    }
+                    if(unitedJobs.details.Count > 0) {
+                        unitedJobList.Add(unitedJobs);
+                    }
+                }
+                return unitedJobList;
+            }
+            catch (System.Exception e) {
+                JobListing errorMessage = new JobListing();
+                errorMessage.host = "Processing Error";
+                errorMessage.details.Add(new Details());
+                errorMessage.details[0].applink = urlList[12];
+                errorMessage.details[0].title = "Error Details";
+                errorMessage.details[0].description = e.ToString();
+                unitedJobList.Add(errorMessage);
+                return unitedJobList;
             }
         }
 
