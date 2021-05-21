@@ -671,12 +671,24 @@ namespace Company.Function
             }
         }
 
+        [FunctionName("DurableFanOutInCSC4940_TimerStart")]
+        public static async Task TimerStart(
+            [TimerTrigger("0 0 6,18 * * *")] TimerInfo timerInfo, //This should be "twice per day, at six in the morning and six in the evening".
+            [DurableClient] IDurableOrchestrationClient starter,
+            ILogger log)
+        {
+            string instanceId = await starter.StartNewAsync("DurableFanOutInCSC4940", null);
+
+            log.LogInformation($"Started orchestration with ID = '{instanceId}'.");
+        }
+
+        /*
         [FunctionName("DurableFanOutInCSC4940_HttpStart")]
         public static async Task<HttpResponseMessage> HttpStart(
-            /*TODO: Add TimerStart and disable this when it's no longer needed
-            This function starts the "Durable Function" (that is, the program) via HTTP request.
-            It is used for debugging. When not in use, it should be disabled.
-            Normally this Durable Function will be started with a Timer Trigger instead.*/
+            
+            //This function starts the "Durable Function" (that is, the program) via HTTP request.
+            //It is used for debugging. When not in use, it should be disabled.
+            //Normally this Durable Function will be started with a Timer Trigger instead.
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post")] HttpRequestMessage req,
             [DurableClient] IDurableOrchestrationClient starter,
             ILogger log)
@@ -688,5 +700,6 @@ namespace Company.Function
 
             return starter.CreateCheckStatusResponse(req, instanceId);
         }
+        */
     }
 }
