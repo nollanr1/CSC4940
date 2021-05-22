@@ -74,7 +74,7 @@ namespace Company.Function
             }
 
             await Task.WhenAll(parallelTasks); //Thus we don't proceed past until all threads finish.
-
+            log.LogInformation("All HTML fetched.");
             //Now we'll prepare the blob client.
             //I used to have this during the async part...
             //But I believe it was firing on each thread. Which I don't want.
@@ -110,7 +110,7 @@ namespace Company.Function
                 summatedJobList.AddRange(UnitedIndiansProcessor(parallelTasks[12].Result, log));
                 //TODO: Add the rest of the jobs! Also, see if I can do this async.
                 outputs.Add("{\"hosts\": "+ JsonConvert.SerializeObject(summatedJobList) + "}");
-
+                log.LogInformation("JSON assembled.");
 
                 /*******************
                 This next code turns the strings into streams.
@@ -122,7 +122,7 @@ namespace Company.Function
                 writer.Flush();
                 stream.Position = 0;
                 //***END string-to-stream conversion code***
-                blobClient.Upload(stream, true).ToString();
+                log.LogInformation("Blob upload state: " + blobClient.Upload(stream, true).ToString());
                 
                 return outputs; //TODO: Swap this return value for something more lightweight, since I've uploaded needed data?
             }
@@ -685,6 +685,10 @@ namespace Company.Function
         [FunctionName("DurableFanOutInCSC4940_TimerStart")]
         public static async Task TimerStart(
             [TimerTrigger("0 0 6,18 * * *")] TimerInfo timerInfo, //This should be "twice per day, at six in the morning and six in the evening".
+            //By default this is in UCT: Set local time with "WEBSITE_TIME_ZONE" in local.settings.json for a local run.
+            //In Azure's cloud, [Function Name] > Configuration > Application settings > New application setting > Name = WEBSITE_TIME_ZONE && Value = [Time Zone We Want]
+            //Time zone names are available from https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-vista/cc749073(v=ws.10)?redirectedfrom=MSDN
+            //But who knows how long that'll be available for, it's already depreciated.
             [DurableClient] IDurableOrchestrationClient starter,
             ILogger log)
         {
