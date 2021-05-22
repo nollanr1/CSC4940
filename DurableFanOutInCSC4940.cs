@@ -78,49 +78,60 @@ namespace Company.Function
             //Now we'll prepare the blob client.
             //I used to have this during the async part...
             //But I believe it was firing on each thread. Which I don't want.
-            var builder = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetCurrentDirectory()) //Hopefully that doesn't mess something ELSE up.
-                .AddJsonFile("appsettings.json");
-            var configuration = builder.Build();
-            var connectionString = configuration.GetConnectionString("StorageAccount");
-            BlobContainerClient container = new BlobContainerClient(connectionString, containerName);
-            container.CreateIfNotExists(); //It SHOULD exist, but just in case it doesn't...
-            BlobClient blobClient = container.GetBlobClient(blobName);
+            try { //In case something in my configuration is off, this should allow the program to die instead of spinning forever...
+            //Hopefully my Azure credit wasn't destroyed by the absence of this try/catch in the first run.
+                var builder = new ConfigurationBuilder()
+                    .SetBasePath(Directory.GetCurrentDirectory()) //Hopefully that doesn't mess something ELSE up.
+                    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true) //The "optional" is because Microsoft's Cloud Version won't have this file. So this line is for local testing only.
+                    .AddEnvironmentVariables(); //This gets the connection string when in the Azure Cloud environment.
+                    //Through Azure Portal, add this string via Configuration > Connection strings. As ever, don't include this string in the git repo!
+                var configuration = builder.Build();
+                var connectionString = configuration.GetConnectionString("StorageAccount");
+                BlobContainerClient container = new BlobContainerClient(connectionString, containerName);
+                container.CreateIfNotExists(); //It SHOULD exist, but just in case it doesn't...
+                BlobClient blobClient = container.GetBlobClient(blobName);
 
-            List<JobListing> summatedJobList = new List<JobListing>();
-            //I've found it's best to practice these queries with a seperate, small program I have elsewhere.
-            summatedJobList.AddRange(TaleoNetProcessor(parallelTasks[0].Result, log)); //Here's hoping this is the correct way to pass the logger.
-            summatedJobList.AddRange(NordicMuseumProcessor(parallelTasks[1].Result, log));
-            summatedJobList.AddRange(SeattleAquariumProcessor(parallelTasks[2].Result, log));
-            summatedJobList.AddRange(VirginiaVProcessor(parallelTasks[3].Result, log));
-            //TODO: Make the following program follow the job links to retrieve details.
-            //This'll be a stretch goal, and should be retrofittable into the base product.
-            summatedJobList.AddRange(SeaArtMuseumProcessor(parallelTasks[4].Result, log));
-            summatedJobList.AddRange(MoPopProcessor(parallelTasks[5].Result, log));
-            summatedJobList.AddRange(FryeMuseumProcessor(parallelTasks[6].Result, log));
-            summatedJobList.AddRange(HenryArtProcessor(parallelTasks[7].Result, log)); //This actually doesn't need to follow links, unless I get a PDF reader...
-            summatedJobList.AddRange(MohaiProcessor(parallelTasks[8].Result, log));
-            summatedJobList.AddRange(ChildrensMuseumProcessor(parallelTasks[9].Result, log)); //This is a full processor, not a slim one - so it's as done as it can be. No links to follow.
-            summatedJobList.AddRange(WingLukeProcessor(parallelTasks[10].Result, log)); //This actually doesn't need to follow links, unless I get a PDF reader...
-            summatedJobList.AddRange(ParkZooProcessor(parallelTasks[11].Result, log));
-            summatedJobList.AddRange(UnitedIndiansProcessor(parallelTasks[12].Result, log));
-            //TODO: Add the rest of the jobs! Also, see if I can do this async.
-            outputs.Add("{\"hosts\": "+ JsonConvert.SerializeObject(summatedJobList) + "}");
+                List<JobListing> summatedJobList = new List<JobListing>();
+                //I've found it's best to practice these queries with a seperate, small program I have elsewhere.
+                summatedJobList.AddRange(TaleoNetProcessor(parallelTasks[0].Result, log)); //Here's hoping this is the correct way to pass the logger.
+                summatedJobList.AddRange(NordicMuseumProcessor(parallelTasks[1].Result, log));
+                summatedJobList.AddRange(SeattleAquariumProcessor(parallelTasks[2].Result, log));
+                summatedJobList.AddRange(VirginiaVProcessor(parallelTasks[3].Result, log));
+                //TODO: Make the following program follow the job links to retrieve details.
+                //This'll be a stretch goal, and should be retrofittable into the base product.
+                summatedJobList.AddRange(SeaArtMuseumProcessor(parallelTasks[4].Result, log));
+                summatedJobList.AddRange(MoPopProcessor(parallelTasks[5].Result, log));
+                summatedJobList.AddRange(FryeMuseumProcessor(parallelTasks[6].Result, log));
+                summatedJobList.AddRange(HenryArtProcessor(parallelTasks[7].Result, log)); //This actually doesn't need to follow links, unless I get a PDF reader...
+                summatedJobList.AddRange(MohaiProcessor(parallelTasks[8].Result, log));
+                summatedJobList.AddRange(ChildrensMuseumProcessor(parallelTasks[9].Result, log)); //This is a full processor, not a slim one - so it's as done as it can be. No links to follow.
+                summatedJobList.AddRange(WingLukeProcessor(parallelTasks[10].Result, log)); //This actually doesn't need to follow links, unless I get a PDF reader...
+                summatedJobList.AddRange(ParkZooProcessor(parallelTasks[11].Result, log));
+                summatedJobList.AddRange(UnitedIndiansProcessor(parallelTasks[12].Result, log));
+                //TODO: Add the rest of the jobs! Also, see if I can do this async.
+                outputs.Add("{\"hosts\": "+ JsonConvert.SerializeObject(summatedJobList) + "}");
 
 
-            /*******************
-            This next code turns the strings into streams.
-            If there's some sort of StringStream class, I couldn't find documentation for it.
-            ********************/
-            var stream = new MemoryStream();
-            var writer = new StreamWriter(stream);
-            writer.Write(outputs[0]);
-            writer.Flush();
-            stream.Position = 0;
-            //***END string-to-stream conversion code***
-            blobClient.Upload(stream, true).ToString();
+                /*******************
+                This next code turns the strings into streams.
+                If there's some sort of StringStream class, I couldn't find documentation for it.
+                ********************/
+                var stream = new MemoryStream();
+                var writer = new StreamWriter(stream);
+                writer.Write(outputs[0]);
+                writer.Flush();
+                stream.Position = 0;
+                //***END string-to-stream conversion code***
+                blobClient.Upload(stream, true).ToString();
+                
+                return outputs; //TODO: Swap this return value for something more lightweight, since I've uploaded needed data?
+            }
+            catch (System.Exception e) {
+                log.LogInformation("Critical Error during tail-end: " + e.ToString());
+                outputs.Add(e.ToString());
+                return outputs;
+            }
             
-            return outputs; //TODO: Swap this return value for something more lightweight, since I've uploaded needed data?
         }
 
         [FunctionName("DurableFanOutInCSC4940_FetchHTML")]
@@ -682,14 +693,14 @@ namespace Company.Function
             log.LogInformation($"Started orchestration with ID = '{instanceId}'.");
         }
 
-        /*
+        //TODO: DISABLE THIS IF KEY EXPOSED, otherwise it's fiiine.
         [FunctionName("DurableFanOutInCSC4940_HttpStart")]
         public static async Task<HttpResponseMessage> HttpStart(
             
             //This function starts the "Durable Function" (that is, the program) via HTTP request.
-            //It is used for debugging. When not in use, it should be disabled.
+            //It is used for debugging. If the key is exposed, it should be disabled.
             //Normally this Durable Function will be started with a Timer Trigger instead.
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post")] HttpRequestMessage req,
+            [HttpTrigger(AuthorizationLevel.Function, "get", "post")] HttpRequestMessage req,
             [DurableClient] IDurableOrchestrationClient starter,
             ILogger log)
         {
@@ -700,6 +711,6 @@ namespace Company.Function
 
             return starter.CreateCheckStatusResponse(req, instanceId);
         }
-        */
+        
     }
 }
